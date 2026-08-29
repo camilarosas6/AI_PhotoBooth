@@ -12,6 +12,12 @@ GRAY = "#AFAFAF"
 
 BORDER = "#444444"
 
+CURTAIN_DARK = "#8B0D16"
+CURTAIN_LIGHT = "#D51A28"
+CURTAIN_SHADOW = "#5E080F"
+
+GOLD="#D4AF37"
+
 BUTTON_TEXT = "TOMAR FOTO"
 
 class PhotoBoothApp(ctk.CTk):
@@ -29,6 +35,8 @@ class PhotoBoothApp(ctk.CTk):
 
         self.create_layout()
 
+        self.create_curtains()
+
     def select_style(self, style):
         self.selected_style = style
 
@@ -36,7 +44,8 @@ class PhotoBoothApp(ctk.CTk):
             if name == style:
                 button.configure(
                     fg_color="#C1121F",
-                    border_color="#FFFFFF"
+                    border_color="#FFFFFF",
+                    border_width=3
                 )
             else:
                 button.configure(
@@ -47,14 +56,53 @@ class PhotoBoothApp(ctk.CTk):
 
     def create_title(self):
 
-        self.titleLabel = ctk.CTkLabel(
-            self, 
+        self.title_frame = ctk.CTkFrame(
+            self,
+            fg_color="transparent"
+        )
+
+        self.title_frame.pack(
+            fill="x",
+            pady=(10, 10)
+        )
+
+        # linea superior
+        self.top_line = ctk.CTkFrame(
+            self.title_frame,
+            fg_color=RED,
+            height=4,
+            corner_radius=2
+        )
+
+        self.top_line.pack(
+            fill="x",
+            padx=40
+        )
+
+        # Titulo
+        self.title_label = ctk.CTkLabel(
+            self.title_frame,
             text="AI PHOTO BOOTH",
-            font=("Arial", 60, "bold"),
+            font=("Super Funky", 60),
             text_color=WHITE
         )
 
-        self.titleLabel.pack(pady=(20,25))
+        self.title_label.pack(
+            pady=10
+        )
+
+        # Linea inferior
+        self.bottom_line = ctk.CTkFrame(
+            self.title_frame,
+            fg_color=RED,
+            height=4,
+            corner_radius=2
+        )
+
+        self.bottom_line.pack(
+            fill="x",
+            padx=40
+        )
 
     def create_layout(self):
 
@@ -70,27 +118,20 @@ class PhotoBoothApp(ctk.CTk):
             pady=(10,30)
         )
 
-        self.top_frame = ctk.CTkFrame(
-            self.main_frame, 
-            fg_color="transparent"
-        )
-
-        self.top_frame.pack(fill="x")
-
         # ------ Cámara ------
 
         self.camera_frame = ctk.CTkFrame(
             self.main_frame,
             fg_color=CARD,
             corner_radius=20,
-            height=300
+            height=280
         )
 
         self.camera_frame.pack_propagate(False)
 
         self.camera_frame.pack(
             fill="x", 
-            pady=20,
+            pady=5,
             padx=20
         )
 
@@ -112,18 +153,20 @@ class PhotoBoothApp(ctk.CTk):
             fg_color="transparent"
         )
 
-        self.button_frame.pack(fill="x", pady=25)
+        self.button_frame.pack(fill="x", pady=10)
 
         self.capture_button = ctk.CTkButton(
             self.button_frame,
             text="TAKE PIC",
-            font=("Arial", 24, "bold"),
+            font=("Anton", 24),
             fg_color=RED,
             hover_color=RED_HOVER,
             text_color=WHITE,
-            width=300,
-            height=70,
-            corner_radius=20
+            width=320,
+            height=75,
+            corner_radius=18,
+            border_width=2,
+            border_color=WHITE
         )
 
         self.capture_button.pack()
@@ -132,13 +175,12 @@ class PhotoBoothApp(ctk.CTk):
             self.main_frame, 
             fg_color=CARD,
             corner_radius=20,
-            height=250
+            height=160
         )
 
         self.result_frame.pack(
-            fill="both",
-            expand=True,
-            pady=(10,0)
+            fill="x",
+            pady=(5,0)
             )
         
         self.style_label = ctk.CTkLabel(
@@ -156,7 +198,7 @@ class PhotoBoothApp(ctk.CTk):
         )
 
         self.style_frame.pack(
-            pady=10
+            pady=5
         )
 
         styles = [
@@ -166,15 +208,18 @@ class PhotoBoothApp(ctk.CTk):
             "CYBERPUNK"
         ]
 
+        row = 0
+        col = 0
+
         for style in styles:
             button = ctk.CTkButton(
                 self.style_frame,
                 text=style,
-                width=130,
-                height=45,
+                width=160,
+                height=55,
                 corner_radius=15,
                 fg_color="#2A2A2A",
-                hover_color="#C1121F",
+                hover_color=RED,
                 border_width=2,
                 border_color="#555555",
                 text_color=WHITE,
@@ -183,7 +228,214 @@ class PhotoBoothApp(ctk.CTk):
 
             self.style_buttons[style] = button
 
-            button.pack(
-                side="left",
-                padx=10
+            button.grid(
+                row=row,
+                column=col,
+                padx=10,
+                pady=8
             )
+
+            col += 1
+
+            if col == 2:
+                col = 0
+                row += 1
+
+    def create_curtains(self):
+
+        # ===== Cortina izquierda =====
+
+        self.left_curtain = ctk.CTkFrame(
+            self,
+            fg_color=RED,
+            corner_radius=0
+        )
+
+        self.left_curtain.place(
+            relx=0,
+            rely=0,
+            relwidth=0.5,
+            relheight=1
+        )
+
+        # ===== Cortina derecha =====
+
+        self.right_curtain = ctk.CTkFrame(
+            self,
+            fg_color=RED,
+            corner_radius=0
+        )
+
+        self.right_curtain.place(
+            relx=0.5,
+            rely=0,
+            relwidth=0.5,
+            relheight=1
+        )
+
+        # ===== Pliegues =====
+
+        self.left_folds = []
+        self.right_folds = []
+
+        for i in range(10):
+
+            if i % 2 == 0:
+                fold_color = CURTAIN_DARK
+            else:
+                fold_color = CURTAIN_SHADOW
+
+            left_fold = ctk.CTkFrame(
+                self.left_curtain,
+                fg_color=fold_color,
+                corner_radius=0,
+                width=8
+            )
+
+            right_fold = ctk.CTkFrame(
+                self.right_curtain,
+                fg_color=fold_color,
+                corner_radius=0,
+                width=8
+            )
+
+            self.left_folds.append(left_fold)
+            self.right_folds.append(right_fold)
+
+        # ===== Parte superior =====
+
+        self.curtain_top = ctk.CTkFrame(
+            self,
+            fg_color=CURTAIN_DARK,
+            corner_radius=0,
+            height=35
+        )
+
+        self.curtain_top.place(
+            relx=0,
+            rely=0,
+            relwidth=1
+        )
+
+        # ===== Amarres =====
+
+        self.left_tie = ctk.CTkFrame(
+            self,
+            fg_color=GOLD,
+            corner_radius=10,
+            width=12,
+            height=90
+        )
+
+        self.right_tie = ctk.CTkFrame(
+            self,
+            fg_color=GOLD,
+            corner_radius=10,
+            width=12,
+            height=90
+        )
+
+        self.left_tie.place(
+            relx=0.02,
+            rely=0.55,
+            anchor="w"
+        )
+
+        self.right_tie.place(
+            relx=0.98,
+            rely=0.55,
+            anchor="e"
+        )
+
+        # ===== Posición inicial =====
+
+        self.curtain_progress = 0
+
+        self.after(500, self.animate_curtains)
+
+    def animate_curtains(self):
+
+        self.curtain_progress += 0.025
+
+        if self.curtain_progress <= 1:
+
+            # ===== Movimiento suave =====
+
+            ease = 1 - (1 - self.curtain_progress) ** 3
+
+            # Ancho de las cortinas
+            curtain_width = 0.5 * (1 - ease)
+
+            # ===== CORTINA IZQUIERDA =====
+
+            self.left_curtain.place(
+                relx=0,
+                rely=0,
+                relwidth=curtain_width,
+                relheight=1
+            )
+
+            # ===== CORTINA DERECHA =====
+
+            self.right_curtain.place(
+                relx=1 - curtain_width,
+                rely=0,
+                relwidth=curtain_width,
+                relheight=1
+            )
+
+            # ===== PLIEGUES IZQUIERDOS =====
+
+            for i, fold in enumerate(self.left_folds):
+
+                # Posición normal del pliegue
+                normal_position = (i + 1) / 11
+
+                # Conforme la cortina se abre,
+                # los pliegues se concentran en el extremo
+                compressed_position = normal_position * (1 - ease)
+
+                fold.place(
+                    relx=compressed_position,
+                    rely=0,
+                    relheight=1,
+                    anchor="n"
+                )
+
+            # ===== PLIEGUES DERECHOS =====
+
+            for i, fold in enumerate(self.right_folds):
+
+                normal_position = (i + 1) / 11
+
+                compressed_position = normal_position * (1 - ease)
+
+                fold.place(
+                    relx=1 - compressed_position,
+                    rely=0,
+                    relheight=1,
+                    anchor="n"
+                )
+
+            self.after(20, self.animate_curtains)
+
+        else:
+
+            # ===== POSICIÓN FINAL =====
+
+            self.left_curtain.place(
+                relx=0,
+                rely=0,
+                relwidth=0.045,
+                relheight=1
+            )
+
+            self.right_curtain.place(
+                relx=0.955,
+                rely=0,
+                relwidth=0.045,
+                relheight=1
+            )
+
+            # Ocultar barra superior
+            self.curtain_top.place_forget()

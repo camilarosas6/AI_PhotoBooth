@@ -1,5 +1,16 @@
+import threading
 import customtkinter as ctk
-# ===== Colores =====
+from pathlib import Path
+from io import BytesIO
+from camera import Camera
+from openai_client import OpenAIClient
+
+try:
+    from PIL import Image, ImageEnhance
+except ImportError:
+    Image = None
+    ImageEnhance = None
+# Colores
 BACKGROUND = "#111111"
 CARD = "#1E1E1E"
 CARD_HOVER = "#252525"
@@ -24,9 +35,12 @@ class PhotoBoothApp(ctk.CTk):
 
     def __init__(self):
         super().__init__()
+        self.camera = Camera("192.168.1.116") # Replace with your camera's IP address
+        self.openai_client = OpenAIClient()
 
         self.title("AI Photo Booth")
-        self.geometry("900x700")
+        self.geometry("1000x850")
+        self.minsize(900, 760)
 
         self.create_title()
 
@@ -35,7 +49,7 @@ class PhotoBoothApp(ctk.CTk):
 
         self.create_layout()
 
-        self.create_curtains()
+        self.configure(fg_color=BACKGROUND)
 
     def select_style(self, style):
         self.selected_style = style
@@ -53,6 +67,285 @@ class PhotoBoothApp(ctk.CTk):
                     border_color="#555555"
                 )
         print(f"Selected. style: {style}")
+
+    def start_capture(self):
+
+        if self.selected_style is None:
+            self.style_label.configure (
+                text = "CHOOSE A STYLE FIRST",
+                text_color = RED
+            )
+
+            self.after (
+                1500,
+                lambda: self.style_label.configure (
+                    text = "CHOOSE STYLE",
+                    text_color = WHITE
+                )
+            )
+
+            return
+
+        # Evitar presionar varias veces
+        self.capture_button.configure(state="disabled")
+
+        self.countdown = 3
+        self.show_countdown()
+
+    def show_countdown(self):
+        if self.countdown > 0:
+            self.camera_label.configure(
+                text=str(self.countdown),
+                font=("Arial", 90, "bold"),
+                text_color=WHITE
+            )
+
+            self.countdown -= 1
+            self.after(800, self.show_countdown)
+
+        else:
+            self.take_photo()
+
+    def take_photo(self):
+        self.camera_label.configure(
+            text="",
+            fg_color=WHITE
+        )
+
+        self.after(
+            150, self.capture_camera_photo
+        )
+
+    def capture_camera_photo(self):
+        try:
+            image_data = self.camera.get_snapshot()
+
+            image = Image.open(BytesIO(image_data))
+            self.original_photo = image.copy()
+            
+
+            image.thumbnail((800, 250), Image.Resampling.LANCZOS)
+
+            self.camera_photo = ctk.CTkImage(
+                light_image=image,
+                dark_image=image,
+                size=image.size,
+            )
+
+            self.camera_label.configure(
+                image=self.camera_photo,
+                text=""
+            )
+
+            self.after (
+                500,
+                self.start_ai_generation
+            )
+
+        except Exception as error:
+            print(f"Failed to capture photo: {error}")
+
+            self.camera_label.configure(
+                text = "CAMERA ERROR",
+                image = None,
+                font = ("Arial", 30, "bold"),
+                text_color = RED
+            )
+
+            self.capture_button.configure(state="normal")
+
+    def show_photo(self):
+        self.camera_label.configure(
+            fg_color= CARD
+        )
+
+        self.camera_label.configure(
+            text="PHOTO TAKEN!",
+            font=("Arial", 30, "bold"),
+            text_color=WHITE
+        )
+
+        self.after(
+            150, self.show_polarid
+        )
+
+    def show_polarid(self):
+
+        self.polaroid = ctk.CTkFrame(
+            self,
+            width = 360,
+            height = 430,
+            fg_color = "#F5F5F5",
+            border_width = 1,
+            border_color = "#D8D8D8",
+            corner_radius = 6
+        )
+
+        self.polaroid.place(
+            relx = 0.5,
+            rely = 1.2,
+            anchor = "center"
+        )
+
+        self.polaroid_img_frame = ctk.CTkFrame(
+            self.polaroid,
+            width = 320,
+            height = 320,
+            fg_color = "#222222",
+            border_width = 2,
+            border_color = "#D8D8D8",
+            corner_radius = 2
+        )
+
+        self.polaroid_img_frame.place(
+            relx=0.5,
+            rely=0.43,
+            anchor="center"
+        )
+
+        self.polaroid_img = ctk.CTkLabel(
+            self.polaroid_img_frame,
+            text="",
+        )
+
+        self.polaroid_img.pack(
+            fill="both",
+            expand=True
+        )
+
+        self.polaroid_text = ctk.CTkLabel(
+            self.polaroid,
+            text="AI PHOTO BOOTH",
+            font=("Arial", 18, "bold"),
+            text_color="#222222",
+        )
+        self.polaroid_text.place(
+            relx = 0.5,
+            rely = 0.88,
+            anchor = "center"
+        )
+
+        self.load_test_image()
+        self.animate_polaroid()
+
+    def load_test_image(self):
+        if Image is None or ImageEnhance is None:
+            self.polaroid_img.configure(text="PHOTO TAKEN", text_color=WHITE)
+            self.polaroid_text.configure(text="PILLOW IS REQUIRED FOR PHOTO PREVIEW")
+            self.after(2000, lambda: self.capture_button.configure(state="normal"))
+            return
+
+        image_path = Path(__file__).parent / "assets" / "test_photo.jpeg"
+        image = Image.open(image_path)
+
+        image.thumbnail((300, 300), Image.Resampling.LANCZOS)
+
+        self.original_image = image
+        self.update_reveal(0)
+
+    def update_reveal(self, step):
+        if step > 10:
+            self.polaroid_text.configure(text="AI PHOTO BOOTH")
+            self.capture_button.configure(state="normal")
+            return
+
+        brightness = 0.15 + (step / 10) * 0.85
+
+        revealed = ImageEnhance.Brightness(self.original_image).enhance(brightness)
+
+        self.polaroid_photo = ctk.CTkImage(
+            light_image=revealed,
+            dark_image=revealed,
+            size=revealed.size,
+        )
+
+        self.polaroid_img.configure(image=self.polaroid_photo)
+
+        self.polaroid_text.configure(text="DEVELOPING ...")
+
+        self.after(180, lambda: self.update_reveal(step + 1))
+
+    def animate_polaroid(self):
+        self.polaroid_y = 1.2
+        self.move_polaroid()
+
+    def move_polaroid(self):
+        self.polaroid_y -= 0.04
+
+        if self.polaroid_y > 0.5:
+            self.polaroid.place(
+                relx=0.5,
+                rely=self.polaroid_y,
+                anchor="center"
+            )
+
+            self.after(
+                20,
+                self.move_polaroid
+            )
+
+        else:
+            self.polaroid.place(
+                relx=0.5,
+                rely=0.5,
+                anchor="center"
+            )
+
+    def generate_ai_photo(self):
+        try:
+            print(
+                f"Generating image with style: "
+                f"{self.select_style}"
+            )
+
+            image_data = self.openai_client.generate_img(
+                self.original_photo,
+                self.select_style
+            )
+
+            self.after (
+                0, lambda: self.show_generated_photo(image_data)
+            )
+
+        except Exception as error:
+            print(f"OpenAI error: {error}")
+
+            self.after(
+                0, self.show_generation_error
+            )
+
+    def start_ai_generation(self):
+        thread = threading.Thread(
+            target=self.generate_ai_photo,
+            daemon=True
+        )
+
+        thread.start()
+
+    def show_generating(self):
+        self.camera_label.configure(
+            text = "GENERATING IMAGE ...",
+            image = None,
+            text_color = WHITE
+        )
+
+    def show_generated_photo(self, image_data):
+        image = Image.open(
+            BytesIO(image_data)
+        )
+
+        self.generated_photo = image.copy()
+        self.show_polarid()
+
+    def show_generation_error(self):
+        self.camera_label.configure(
+            text = "GENERATION ERROR",
+            image = None,
+            text_color = RED
+        )
+
+        self.capture_button.configure(state = "normal")
+
 
     def create_title(self):
 
@@ -107,7 +400,7 @@ class PhotoBoothApp(ctk.CTk):
     def create_layout(self):
 
         self.main_frame = ctk.CTkFrame(
-            self, 
+            self,
             fg_color="transparent"
         )
 
@@ -130,13 +423,13 @@ class PhotoBoothApp(ctk.CTk):
         self.camera_frame.pack_propagate(False)
 
         self.camera_frame.pack(
-            fill="x", 
+            fill="x",
             pady=5,
             padx=20
         )
 
         self.camera_label = ctk.CTkLabel(
-            self.camera_frame, 
+            self.camera_frame,
             text="CAMERA PREVIEW",
             font=("Arial", 30, "bold"),
             text_color=GRAY
@@ -149,7 +442,7 @@ class PhotoBoothApp(ctk.CTk):
         )
 
         self.button_frame = ctk.CTkFrame(
-            self.main_frame, 
+            self.main_frame,
             fg_color="transparent"
         )
 
@@ -166,13 +459,14 @@ class PhotoBoothApp(ctk.CTk):
             height=75,
             corner_radius=18,
             border_width=2,
-            border_color=WHITE
+            border_color=WHITE,
+            command = self.start_capture
         )
 
         self.capture_button.pack()
 
         self.result_frame = ctk.CTkFrame(
-            self.main_frame, 
+            self.main_frame,
             fg_color=CARD,
             corner_radius=20,
             height=160
@@ -182,7 +476,7 @@ class PhotoBoothApp(ctk.CTk):
             fill="x",
             pady=(5,0)
             )
-        
+
         self.style_label = ctk.CTkLabel(
             self.result_frame,
             text="CHOOSE STYLE",
@@ -240,202 +534,3 @@ class PhotoBoothApp(ctk.CTk):
             if col == 2:
                 col = 0
                 row += 1
-
-    def create_curtains(self):
-
-        # ===== Cortina izquierda =====
-
-        self.left_curtain = ctk.CTkFrame(
-            self,
-            fg_color=RED,
-            corner_radius=0
-        )
-
-        self.left_curtain.place(
-            relx=0,
-            rely=0,
-            relwidth=0.5,
-            relheight=1
-        )
-
-        # ===== Cortina derecha =====
-
-        self.right_curtain = ctk.CTkFrame(
-            self,
-            fg_color=RED,
-            corner_radius=0
-        )
-
-        self.right_curtain.place(
-            relx=0.5,
-            rely=0,
-            relwidth=0.5,
-            relheight=1
-        )
-
-        # ===== Pliegues =====
-
-        self.left_folds = []
-        self.right_folds = []
-
-        for i in range(10):
-
-            if i % 2 == 0:
-                fold_color = CURTAIN_DARK
-            else:
-                fold_color = CURTAIN_SHADOW
-
-            left_fold = ctk.CTkFrame(
-                self.left_curtain,
-                fg_color=fold_color,
-                corner_radius=0,
-                width=8
-            )
-
-            right_fold = ctk.CTkFrame(
-                self.right_curtain,
-                fg_color=fold_color,
-                corner_radius=0,
-                width=8
-            )
-
-            self.left_folds.append(left_fold)
-            self.right_folds.append(right_fold)
-
-        # ===== Parte superior =====
-
-        self.curtain_top = ctk.CTkFrame(
-            self,
-            fg_color=CURTAIN_DARK,
-            corner_radius=0,
-            height=35
-        )
-
-        self.curtain_top.place(
-            relx=0,
-            rely=0,
-            relwidth=1
-        )
-
-        # ===== Amarres =====
-
-        self.left_tie = ctk.CTkFrame(
-            self,
-            fg_color=GOLD,
-            corner_radius=10,
-            width=12,
-            height=90
-        )
-
-        self.right_tie = ctk.CTkFrame(
-            self,
-            fg_color=GOLD,
-            corner_radius=10,
-            width=12,
-            height=90
-        )
-
-        self.left_tie.place(
-            relx=0.02,
-            rely=0.55,
-            anchor="w"
-        )
-
-        self.right_tie.place(
-            relx=0.98,
-            rely=0.55,
-            anchor="e"
-        )
-
-        # ===== Posición inicial =====
-
-        self.curtain_progress = 0
-
-        self.after(500, self.animate_curtains)
-
-    def animate_curtains(self):
-
-        self.curtain_progress += 0.025
-
-        if self.curtain_progress <= 1:
-
-            # ===== Movimiento suave =====
-
-            ease = 1 - (1 - self.curtain_progress) ** 3
-
-            # Ancho de las cortinas
-            curtain_width = 0.5 * (1 - ease)
-
-            # ===== CORTINA IZQUIERDA =====
-
-            self.left_curtain.place(
-                relx=0,
-                rely=0,
-                relwidth=curtain_width,
-                relheight=1
-            )
-
-            # ===== CORTINA DERECHA =====
-
-            self.right_curtain.place(
-                relx=1 - curtain_width,
-                rely=0,
-                relwidth=curtain_width,
-                relheight=1
-            )
-
-            # ===== PLIEGUES IZQUIERDOS =====
-
-            for i, fold in enumerate(self.left_folds):
-
-                # Posición normal del pliegue
-                normal_position = (i + 1) / 11
-
-                # Conforme la cortina se abre,
-                # los pliegues se concentran en el extremo
-                compressed_position = normal_position * (1 - ease)
-
-                fold.place(
-                    relx=compressed_position,
-                    rely=0,
-                    relheight=1,
-                    anchor="n"
-                )
-
-            # ===== PLIEGUES DERECHOS =====
-
-            for i, fold in enumerate(self.right_folds):
-
-                normal_position = (i + 1) / 11
-
-                compressed_position = normal_position * (1 - ease)
-
-                fold.place(
-                    relx=1 - compressed_position,
-                    rely=0,
-                    relheight=1,
-                    anchor="n"
-                )
-
-            self.after(20, self.animate_curtains)
-
-        else:
-
-            # ===== POSICIÓN FINAL =====
-
-            self.left_curtain.place(
-                relx=0,
-                rely=0,
-                relwidth=0.045,
-                relheight=1
-            )
-
-            self.right_curtain.place(
-                relx=0.955,
-                rely=0,
-                relwidth=0.045,
-                relheight=1
-            )
-
-            # Ocultar barra superior
-            self.curtain_top.place_forget()

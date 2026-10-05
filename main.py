@@ -1,5 +1,4 @@
 import customtkinter as ctk # pyright: ignore[reportMissingImports]
-
 from ui import PhotoBoothApp 
 
 ctk.set_appearance_mode("dark")

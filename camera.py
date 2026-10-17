@@ -7,7 +7,14 @@ class Camera:
     def get_snapshot(self):
         url = f"http://{self.ip}/capture"
 
-        response = requests.get(url, timeout=5)
+        print(f"Solicitando foto a: {url}")
 
-        response.raise_for_status()  # Raise an exception for HTTP errors
+        response = requests.get(url, timeout=15)
+
+        print(f"Estado HTTP: {response.status_code}")
+        print(f"Tipo de contenido: {response.headers.get('Content-Type')}")
+        print(f"Tamaño recibido: {len(response.content)} bytes")
+
+        response.raise_for_status()
+
         return response.content

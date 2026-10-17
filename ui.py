@@ -36,7 +36,7 @@ class PhotoBoothApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.camera = Camera("192.168.1.116") # Replace with your camera's IP address
-        self.openai_client = OpenAIClient()
+        self.openai_client = None
 
         self.title("AI Photo Booth")
         self.geometry("1000x850")
@@ -166,12 +166,12 @@ class PhotoBoothApp(ctk.CTk):
         )
 
         self.after(
-            150, self.show_polarid
+            150, self.show_polaroid
         )
 
-    def show_polarid(self):
-
-        self.polaroid = ctk.CTkFrame(
+    def show_polaroid(self):
+        # Crear la polaroid
+        self.polaroid = ctk.CTkFrame (
             self,
             width = 360,
             height = 430,
@@ -181,67 +181,72 @@ class PhotoBoothApp(ctk.CTk):
             corner_radius = 6
         )
 
-        self.polaroid.place(
+        self.polaroid.place (
             relx = 0.5,
-            rely = 1.2,
+            rely = 0.5,
             anchor = "center"
         )
 
-        self.polaroid_img_frame = ctk.CTkFrame(
+        # Marco foto
+        self.polaroid_image_frame = ctk.CTkFrame (
             self.polaroid,
             width = 320,
             height = 320,
-            fg_color = "#222222",
+            fg_color = "#D0D0D0",
             border_width = 2,
-            border_color = "#D8D8D8",
+            border_color = "#D0D0D0",
             corner_radius = 2
         )
 
-        self.polaroid_img_frame.place(
-            relx=0.5,
-            rely=0.43,
-            anchor="center"
+        self.polaroid_image_frame.pack (
+            pady = (20, 10)
         )
 
-        self.polaroid_img = ctk.CTkLabel(
-            self.polaroid_img_frame,
-            text="",
+        # Imagen OpenAI
+        self.polaroid_img = ctk.CTkImage (
+            light_image = self.generated_photo,
+            dark_image = self.generated_photo,
+            size = (316, 316)
         )
 
-        self.polaroid_img.pack(
-            fill="both",
-            expand=True
+        # mostrar imagen en label
+        self.polaroid_img_label = ctk.CTkLabel (
+            self.polaroid_image_frame,
+            image = self.polaroid_img,
+            text = ""
         )
 
-        self.polaroid_text = ctk.CTkLabel(
-            self.polaroid,
-            text="AI PHOTO BOOTH",
-            font=("Arial", 18, "bold"),
-            text_color="#222222",
-        )
-        self.polaroid_text.place(
+        self.polaroid_img_label.place (
             relx = 0.5,
-            rely = 0.88,
+            rely = 0.5,
             anchor = "center"
         )
 
-        self.load_test_image()
-        self.animate_polaroid()
+        self.polaroid_label = ctk.CTkLabel (
+            self.polaroid,
+            text = "AI PHOTO BOOTH",
+            font = ("Arial", 16, "bold"),
+            text_color = "#222222"
+        )
 
-    def load_test_image(self):
-        if Image is None or ImageEnhance is None:
-            self.polaroid_img.configure(text="PHOTO TAKEN", text_color=WHITE)
-            self.polaroid_text.configure(text="PILLOW IS REQUIRED FOR PHOTO PREVIEW")
-            self.after(2000, lambda: self.capture_button.configure(state="normal"))
-            return
+        self.polaroid_label.pack (
+            pady = (5, 15)
+        )
 
-        image_path = Path(__file__).parent / "assets" / "test_photo.jpeg"
-        image = Image.open(image_path)
+    #def load_test_image(self):
+    #    if Image is None or ImageEnhance is None:
+    #        self.polaroid_img.configure(text="PHOTO TAKEN", text_color=WHITE)
+    #        self.polaroid_text.configure(text="PILLOW IS REQUIRED FOR PHOTO PREVIEW")
+    #        self.after(2000, lambda: self.capture_button.configure(state="normal"))
+    #        return
 
-        image.thumbnail((300, 300), Image.Resampling.LANCZOS)
+    #    image_path = Path(__file__).parent / "assets" / "test_photo.jpeg"
+    #    image = Image.open(image_path)
 
-        self.original_image = image
-        self.update_reveal(0)
+    #    image.thumbnail((300, 300), Image.Resampling.LANCZOS)
+
+    #    self.original_image = image
+    #    self.update_reveal(0)
 
     def update_reveal(self, step):
         if step > 10:
@@ -293,14 +298,17 @@ class PhotoBoothApp(ctk.CTk):
 
     def generate_ai_photo(self):
         try:
+            if self.openai_client is None:
+                self.openai_client = OpenAIClient()
+
             print(
                 f"Generating image with style: "
-                f"{self.select_style}"
+                f"{self.selected_style}"
             )
 
             image_data = self.openai_client.generate_img(
                 self.original_photo,
-                self.select_style
+                self.selected_style
             )
 
             self.after (
@@ -335,7 +343,7 @@ class PhotoBoothApp(ctk.CTk):
         )
 
         self.generated_photo = image.copy()
-        self.show_polarid()
+        self.show_polaroid()
 
     def show_generation_error(self):
         self.camera_label.configure(
@@ -534,3 +542,4 @@ class PhotoBoothApp(ctk.CTk):
             if col == 2:
                 col = 0
                 row += 1
+                

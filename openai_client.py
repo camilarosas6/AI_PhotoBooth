@@ -1,5 +1,6 @@
 import os
 import base64
+import tempfile
 from openai import OpenAI
 
 class OpenAIClient:
@@ -43,15 +44,17 @@ class OpenAIClient:
     def generate_img(self, image, style):
         prompt = self.get_style_prompt(style)
 
-        image_path = "temp_original.png"
-        image_save = (image_path)
+        with tempfile.NamedTemporaryFile(
+            suffix=".png",
+            delete=False
+        ) as temp_file:
+            image_path = temp_file.name
+
+        image.save(image_path)
 
         with open(image_path, "rb") as image_file:
             result = self.client.images.edit(
                 model="gpt-image-2",
-                image = image_file,
-                prompt = prompt
+                image=image_file,
+                prompt=prompt
             )
-
-        image_base64 = result.data[0].b64_json
-        return base64.b64decode(image_base64)
